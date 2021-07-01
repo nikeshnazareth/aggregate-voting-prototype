@@ -1,0 +1,11 @@
+{
+  "name": "aggregate-voting-prototype",
+  "version": "1.0.0",
+  "description": "A prototype for using Kate commitments and BLS to aggregate votes",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "MIT"
+}
