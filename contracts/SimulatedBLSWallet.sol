@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.6.0;
 
-import "./Alt_BN128Library.sol";
+import "./BN256Adapter.sol";
 
 /**
  * Simulates a wallet that uses BLS signatures
@@ -11,14 +11,15 @@ import "./Alt_BN128Library.sol";
  * Do not use this contract in production code
  */
 contract SimulatedBLSWallet {
-  using Alt_BN128Library for Alt_BN128Library.Point_G1;
+  using BN256Adapter for BN256Adapter.PointG1;
 
   uint256 private PRIVATE_KEY;
+  BN256Adapter.PointG1 public PUBLIC_KEY;
 
-  Alt_BN128Library.Point_G1 public PUBLIC_KEY;
-
-  constructor(string memory _name) {
+  constructor(string memory _name) public {
+    // a simple hack to create a unique predictable value.
     PRIVATE_KEY = uint256(keccak256(bytes(_name)));
-    PUBLIC_KEY = Alt_BN128Library.P1().mul(PRIVATE_KEY);
+    
+    PUBLIC_KEY = BN256Adapter.P1().multiply(PRIVATE_KEY);
   }
 }
