@@ -1,23 +1,19 @@
 {
   "name": "aggregate-voting-prototype",
-  "version": "1.0.0",
+  "version": "0.1",
   "description": "A prototype for using Kate commitments and BLS to aggregate votes",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
+  "author": "nikeshnazareth",
   "license": "MIT",
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
     "chai": "^4.3.4",
     "ethereum-waffle": "^3.4.0",
-    "ethers": "^5.4.0",
-    "hardhat": "^2.4.1"
+    "ethers": "^5.4.1",
+    "hardhat": "^2.4.1",
+    "truffle": "^5.3.14"
   },
   "dependencies": {
-    "bls-solidity": "github:witnet/bls-solidity",
-    "truffle": "^5.3.14"
+    "elliptic-curve-solidity": "0.2.2"
   }
 }
