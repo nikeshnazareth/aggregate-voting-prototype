@@ -21,4 +21,13 @@ contract TestHelper {
         ) public view returns (bool) {
             return BN256Adapter.verify(_message, _signature, _publicKey);
      }
+     /**
+     * Pass-through functions for BN256Adapter.sum (both versions)
+     */
+    function sumG1(BN256Adapter.PointG1[] memory Points) public view returns (BN256Adapter.PointG1 memory) {
+        return BN256Adapter.sum(Points);
+     }
+     function sumG2(BN256Adapter.PointG2[] memory Points) public view returns (BN256Adapter.PointG2 memory) {
+        return BN256Adapter.sum(Points);
+     }
 }

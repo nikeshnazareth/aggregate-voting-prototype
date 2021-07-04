@@ -93,6 +93,51 @@ library BN256Adapter {
     }
 
     /**
+     * @notice computes the sum of all the points
+     * @dev Points must have at least one item
+     * @param Points the list of elliptic curve points (in G1) to add
+     * @return the G1 point corresponding to the sum of the input points
+     */
+    function sum(PointG1[] memory Points) public view returns (PointG1 memory) {
+        require(Points.length > 0, "Cannot sum empty list");
+        PointG1 memory sum = Points[0];
+
+        uint256[4] memory input;
+        for(uint256 i = 1; i < Points.length; i++) {
+            input = [
+                sum.x,
+                sum.y,
+                Points[i].x,
+                Points[i].y
+            ];
+            (uint256 x, uint256 y) = BN256G1.add(input);
+            sum = PointG1({x: x, y: y});
+        }
+        return sum;
+    }
+
+    /**
+     * @notice computes the sum of all the points
+     * @dev Points must have at least one item
+     * @param Points the list of elliptic curve points (in G2) to add
+     * @return the G2 point corresponding to the sum of the input points
+     */
+    function sum(PointG2[] memory Points) public view returns (PointG2 memory) {
+        require(Points.length > 0, "Cannot sum empty list");
+        PointG2 memory sum = Points[0];
+
+        for(uint256 i = 1; i < Points.length; i++) {
+            (uint256 xr, uint256 xi, uint256 yr, uint256 yi) =
+                BN256G2.ecTwistAdd(
+                    sum.x_real, sum.x_imag, sum.y_real, sum.y_imag,
+                    Points[i].x_real, Points[i].x_imag, Points[i].y_real, Points[i].y_imag
+                );
+            sum = PointG2({x_real: xr, x_imag: xi, y_real: yr, y_imag: yi});
+        }
+        return sum;
+    }
+
+    /**
      * @notice uses the `_message` as a seed to produce a psuedorandom point on G1
      * @dev this will check 256 psuedorandom x values to see if it maps to a point on G1
      * The first valid point is returned. The function reverts if no valid points are found
