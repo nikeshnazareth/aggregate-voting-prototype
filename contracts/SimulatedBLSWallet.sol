@@ -1,5 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.6.0;
+pragma experimental ABIEncoderV2;
+
 
 import "./BN256Adapter.sol";
 
@@ -11,6 +13,7 @@ import "./BN256Adapter.sol";
  * Do not use this contract in production code
  */
 contract SimulatedBLSWallet {
+  using BN256Adapter for BN256Adapter.PointG1;
   using BN256Adapter for BN256Adapter.PointG2;
 
   uint256 private PRIVATE_KEY;
@@ -25,5 +28,20 @@ contract SimulatedBLSWallet {
     PRIVATE_KEY = uint256(keccak256(bytes(_name)));
 
     PUBLIC_KEY = BN256Adapter.P2().multiply(PRIVATE_KEY);
+  }
+
+  /**
+   * @notice produce a BLS signature over _message
+   * @dev the hash function used has a small probability of reverting
+   * if a suitable point cannot be found.
+   * The hash can be thought of as (𝛿 * P1) for an unknown 𝛿
+   * The signature would then be (PRIVATE_KEY * 𝛿 * P1)
+   * @param _message the message to be signed
+   * @return the BLS signature
+   */
+  function sign(bytes memory _message) public view returns (BN256Adapter.PointG1 memory) {
+    BN256Adapter.PointG1 memory msgHash = BN256Adapter.hashToG1(_message);
+    BN256Adapter.PointG1 memory sig = msgHash.multiply(PRIVATE_KEY);
+    return msgHash.multiply(PRIVATE_KEY);
   }
 }

@@ -1,0 +1,24 @@
+//SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+pragma experimental ABIEncoderV2;
+
+
+import "../BN256Adapter.sol";
+
+/**
+ * This contract provides helper functions to support unit tests
+ * In particular, it provides a mechanism to interact with the BN256Adapter library directly
+ */
+
+contract TestHelper {
+    /**
+     * Pass-through function for BN256Adapter.verify
+     */
+    function verify(
+        bytes memory _message,
+        BN256Adapter.PointG1 memory _signature,
+        BN256Adapter.PointG2 memory _publicKey
+        ) public view returns (bool) {
+            return BN256Adapter.verify(_message, _signature, _publicKey);
+     }
+}
