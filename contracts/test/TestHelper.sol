@@ -30,4 +30,13 @@ contract TestHelper {
      function sumG2(BN256Adapter.PointG2[] memory Points) public view returns (BN256Adapter.PointG2 memory) {
         return BN256Adapter.sum(Points);
      }
+     /**
+     * Pass-through functions for BN256Adapter.multiply (both versions)
+     */
+     function multiplyG1(BN256Adapter.PointG1 memory Point, uint256 scalar) public view returns (BN256Adapter.PointG1 memory) {
+         return BN256Adapter.multiply(Point, scalar);
+     }
+     function multiplyG2(BN256Adapter.PointG2 memory Point, uint256 scalar) public view returns (BN256Adapter.PointG2 memory) {
+         return BN256Adapter.multiply(Point, scalar);
+     }
 }
