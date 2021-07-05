@@ -31,10 +31,10 @@ library BN256Adapter {
     }
 
     struct PointG2 {
-        uint256 x_real;
         uint256 x_imag;
-        uint256 y_real;
+        uint256 x_real;
         uint256 y_imag;
+        uint256 y_real;
     }
 
     /**
@@ -57,10 +57,24 @@ library BN256Adapter {
      */
     function P2() public pure returns (PointG2 memory) {
         return PointG2({
-            x_real: BN256G2.G2_NEG_X_RE,
             x_imag: BN256G2.G2_NEG_X_IM,
-            y_real: BN256G2.FIELD_MODULUS - BN256G2.G2_NEG_Y_RE,
-            y_imag: BN256G2.FIELD_MODULUS - BN256G2.G2_NEG_Y_IM
+            x_real: BN256G2.G2_NEG_X_RE,
+            y_imag: BN256G2.FIELD_MODULUS - BN256G2.G2_NEG_Y_IM,
+            y_real: BN256G2.FIELD_MODULUS - BN256G2.G2_NEG_Y_RE
+        });
+    }
+
+/**
+     * @dev The generators are defined in EIP197 (https://eips.ethereum.org/EIPS/eip-197)
+     * The BN256G2 library defines negative P2 because that simplifies pairing
+     * @return The negative of the group 2 (G2) generator
+     */
+    function negP2() public pure returns (PointG2 memory) {
+        return PointG2({
+            x_imag: BN256G2.G2_NEG_X_IM,
+            x_real: BN256G2.G2_NEG_X_RE,
+            y_imag: BN256G2.G2_NEG_Y_IM,
+            y_real: BN256G2.G2_NEG_Y_RE
         });
     }
 
@@ -71,11 +85,10 @@ library BN256Adapter {
      * @return the G1 point (scalar * Point)
      */
     function multiply(PointG1 memory Point, uint256 scalar) public view returns (PointG1 memory) {
-        uint256[3] memory input = [
-            Point.x,
-            Point.y,
-            scalar % GROUP_ORDER
-        ];
+        uint256[3] memory input = abi.decode(
+            abi.encode(Point, scalar % GROUP_ORDER),
+            (uint256[3])
+        );
         (uint256 x, uint256 y) = BN256G1.multiply(input);
         return PointG1({x: x, y: y});
     }
@@ -104,12 +117,10 @@ library BN256Adapter {
 
         uint256[4] memory input;
         for(uint256 i = 1; i < Points.length; i++) {
-            input = [
-                sum.x,
-                sum.y,
-                Points[i].x,
-                Points[i].y
-            ];
+            input = abi.decode(
+                abi.encode(sum, Points[i]),
+                (uint256[4])
+            );
             (uint256 x, uint256 y) = BN256G1.add(input);
             sum = PointG1({x: x, y: y});
         }
@@ -164,27 +175,17 @@ library BN256Adapter {
      */
     function verify(bytes memory _message, PointG1 memory _signature, PointG2 memory _publicKey) public view returns (bool) {
         PointG1 memory msgHash = hashToG1(_message);
-        uint256[12] memory input = [
-            msgHash.x,
-            msgHash.y,
-            _publicKey.x_imag,
-            _publicKey.x_real,
-            _publicKey.y_imag,
-            _publicKey.y_real,
-            _signature.x,
-            _signature.y,
-            // `bn256CheckPairing` evaluates whether the two points multiply to 1 (they are inverses)
-            // Therefore, we use -P2 instead of P2.
-            // in other words, transform the check as follows:
-            //     e(H, _publicKey) == e(signature, [P2])
-            // =>  e(H, _publicKey) * inverse(e(signature, [P2])) == 1
-            // =>  e(H, _publicKey) * e(signature, -1⋅[P2]) == 1
-            BN256G2.G2_NEG_X_IM,
-            BN256G2.G2_NEG_X_RE,
-            BN256G2.G2_NEG_Y_IM,
-            BN256G2.G2_NEG_Y_RE
-        ];
 
+        // `bn256CheckPairing` evaluates whether the two points multiply to 1 (they are inverses)
+        // Therefore, we use -P2 instead of P2.
+        // in other words, transform the check as follows:
+        //     e(H, _publicKey) == e(signature, [P2])
+        // =>  e(H, _publicKey) * inverse(e(signature, [P2])) == 1
+        // =>  e(H, _publicKey) * e(signature, -1⋅[P2]) == 1
+        uint256[12] memory input = abi.decode(
+            abi.encode(msgHash, _publicKey, _signature, negP2()),
+            (uint256[12])
+        );
         return BN256G1.bn256CheckPairing(input);
     }
 }
