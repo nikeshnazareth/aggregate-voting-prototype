@@ -150,13 +150,13 @@ library BN256Adapter {
 
     /**
      * @notice validates whether the inputs correspond to a valid BLS signature
-     * @dev the hash of the message can be thought of as H = (𝛿 * P1) for an unknown 𝛿
-     * The signature would then be (PRIVATE_KEY * 𝛿 * P1)
-     * The public key is given by (PRIVATE_KEY * P2)
+     * @dev the hash of the message can be thought of as H = 𝛿⋅[P1] for an unknown 𝛿
+     * The signature would then be PRIVATE_KEY⋅𝛿⋅[P1]
+     * The public key is given by PRIVATE_KEY⋅[P2]
      * If e is an elliptic curve pairing from G1 x G2 -> GT, the function validates whether
-     * e(H, _publicKey) == (signature, P2) or equivalently,
-     * e(𝛿 * P1, PRIVATE_KEY * P2) == e(PRIVATE_KEY * 𝛿 * P1, P2)
-     * Both sides should evaluate to PRIVATE_KEY * 𝛿 * GT
+     * e(H, _publicKey) == e(signature, [P2]) or equivalently,
+     * e(𝛿⋅[P1], PRIVATE_KEY⋅[P2]) == e(PRIVATE_KEY⋅𝛿⋅[P1], [P2])
+     * Both sides should evaluate to PRIVATE_KEY⋅𝛿⋅[PT]
      * @param _message the message that was signed
      * @param _signature the signature of the message
      * @param _publicKey the public key corresponding to the private key that signed the message
@@ -175,6 +175,10 @@ library BN256Adapter {
             _signature.y,
             // `bn256CheckPairing` evaluates whether the two points multiply to 1 (they are inverses)
             // Therefore, we use -P2 instead of P2.
+            // in other words, transform the check as follows:
+            //     e(H, _publicKey) == e(signature, [P2])
+            // =>  e(H, _publicKey) * inverse(e(signature, [P2])) == 1
+            // =>  e(H, _publicKey) * e(signature, -1⋅[P2]) == 1
             BN256G2.G2_NEG_X_IM,
             BN256G2.G2_NEG_X_RE,
             BN256G2.G2_NEG_Y_IM,
