@@ -37,6 +37,14 @@ library BN256Adapter {
         uint256 y_real;
     }
 
+    // represents the equation 1 = e(A, B)*e(C, D)
+    struct PairingEquation {
+        PointG1: A;
+        PointG2: B;
+        PointG1: C;
+        PointG2: D;
+    }
+
     /**
      * @dev The generators are defined in EIP197 (https://eips.ethereum.org/EIPS/eip-197)
      * @return The group 1 (G1) generator
@@ -187,5 +195,30 @@ library BN256Adapter {
             (uint256[12])
         );
         return BN256G1.bn256CheckPairing(input);
+    }
+
+    /**
+     * @notice validates whether all the input equations are satisfied
+     * where each item i represents the equation 1 = e(eqns[i].A, eqns[i].B)*e(eqns[i].C, eqns[i].D)
+     * @dev in order to test the equations with a single pairing, this function combines them pseudorandomly
+     * Eg. to check whether
+     *    1 = e(A1, B1)*e(C1, D1) and
+     *    1 = e(A2, B2)*e(C2, D2)
+     * we can choose a pseudorandom r and check
+     *    1 = e(A1, B1)*e(C1, D1)*e(r⋅A2, B2)*e(r⋅C2, D2)
+     * => 1 = e(A1, B1)*e(C1, D1)*( e(A2, B2)*e(C2, D2) )^r
+     * this is more gas-efficient than checking the individual pairings
+     * @param eqns a list of pairing equations to validate
+     * @return whether all equations are satisfied
+     */
+    function verifyPairingEquations(PairingEquation[] memory eqns) public view returns (bool) {
+        require(eqns.length > 0, "Cannot verify empty list of pairing equations");
+        // update the equations pseudorandomly, starting at index 1
+        uint256 r;
+        for(uint256 i = 1; i < eqns.length; i++) {
+            r = uint256(keccak256(abi.encode(eqns[i])))
+            eqns[i].A = eqns[i].A.multiply(r);
+            eqns[i].C = eqns[i].C.multiply(r);
+        }
     }
 }
