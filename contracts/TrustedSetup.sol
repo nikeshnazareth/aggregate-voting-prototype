@@ -41,8 +41,8 @@ contract TrustedSetup {
     // S[i] = (s^i)⋅[P1]
     BN256Adapter.PointG1[MAX_DEGREE + 1] public S;
 
-    // the value s⋅[P2], which is used to validate future updates to S.
-    BN256Adapter.PointG2 public sP2;
+    // the value s⋅[P2], which is used to verify future updates to S.
+    BN256Adapter.PointG2 public verifierArtifact;
 
     /**
      * @notice Initialize all S values to P1, which implicitly
@@ -52,7 +52,7 @@ contract TrustedSetup {
         for(uint256 i = 0; i <= MAX_DEGREE; i++) {
             S[i] = BN256Adapter.P1();
         }
-        sP2 = BN256Adapter.P2();
+        verifierArtifact = BN256Adapter.P2();
     }
 
     /**
@@ -66,8 +66,8 @@ contract TrustedSetup {
      * be executed using trusted local infrastructure.
      * @param k the entropy to add to the trusted setup
      * @return the updated powers of s, starting with degree 1 (there's no need to update the first term, which is a constant)
-     * @return the PointG1 k⋅[P1], which is used to prove that this update is valid
-     * @return the PointG2 s'⋅[P2], or (ks)⋅[P2], which is used to facilitate future updates
+     * @return the update proof PointG1 k⋅[P1], which is used to prove that this update is valid
+     * @return the verifier artifact PointG2 s'⋅[P2]  ( or (ks)⋅[P2] ), which is used to verify future updates
      */
     function generateUpdateProof(uint256 k) public view
         returns (BN256Adapter.PointG1[MAX_DEGREE] memory , BN256Adapter.PointG1 memory, BN256Adapter.PointG2 memory){

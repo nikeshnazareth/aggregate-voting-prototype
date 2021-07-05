@@ -46,9 +46,9 @@ describe("Trusted Setup", function () {
       }
     });
 
-    it("should set sP2 to P2", async function () {
-      let sp2 = await setup.sP2();
-      expect(sp2).to.deep.equal(P2);
+    it("should set the verifier artifact to P2", async function () {
+      let verifierArtifact = await setup.verifierArtifact();
+      expect(verifierArtifact).to.deep.equal(P2);
     });
   });
 
