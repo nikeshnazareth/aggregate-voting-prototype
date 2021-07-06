@@ -41,7 +41,6 @@ contract SimulatedBLSWallet {
    */
   function sign(bytes memory _message) public view returns (BN256Adapter.PointG1 memory) {
     BN256Adapter.PointG1 memory msgHash = BN256Adapter.hashToG1(_message);
-    BN256Adapter.PointG1 memory sig = msgHash.multiply(PRIVATE_KEY);
     return msgHash.multiply(PRIVATE_KEY);
   }
 }

@@ -41,7 +41,7 @@ contract TrustedSetup {
     // S[i] = (s^i)⋅[P1]
     BN256Adapter.PointG1[MAX_DEGREE + 1] public S;
 
-    // the value s⋅[P2], which is used to verify future updates to S.
+    // the value s⋅[P2], which is used to verify updates to S.
     BN256Adapter.PointG2 public verifierArtifact;
 
     /**
@@ -65,21 +65,86 @@ contract TrustedSetup {
      * anyone listening on the communication channel. Therefore, it should only
      * be executed using trusted local infrastructure.
      * @param k the entropy to add to the trusted setup
-     * @return the updated powers of s, starting with degree 1 (there's no need to update the first term, which is a constant)
+     * @return the updated powers of s
      * @return the update proof PointG1 k⋅[P1], which is used to prove that this update is valid
-     * @return the verifier artifact PointG2 s'⋅[P2]  ( or (ks)⋅[P2] ), which is used to verify future updates
+     * @return the verifier artifact PointG2 s'⋅[P2]  ( or (ks)⋅[P2] ), which is used to verify consistency of the updates
      */
     function generateUpdateProof(uint256 k) public view
-        returns (BN256Adapter.PointG1[MAX_DEGREE] memory , BN256Adapter.PointG1 memory, BN256Adapter.PointG2 memory){
-        BN256Adapter.PointG1[MAX_DEGREE] memory updatedS;
+        returns (BN256Adapter.PointG1[MAX_DEGREE+1] memory , BN256Adapter.PointG1 memory, BN256Adapter.PointG2 memory){
+        BN256Adapter.PointG1[MAX_DEGREE+1] memory updatedS;
 
         uint256 powerOfK;
-        for (uint256 degree = 1; degree <= MAX_DEGREE; degree++) {
+        for (uint256 degree = 0; degree <= MAX_DEGREE; degree++) {
             powerOfK = _modExp(k, degree, BN256Adapter.GROUP_ORDER);
-            updatedS[degree - 1] = S[degree].multiply(powerOfK);
+            updatedS[degree] = S[degree].multiply(powerOfK);
         }
 
-        return (updatedS, BN256Adapter.P1().multiply(k), sP2.multiply(k));
+        return (updatedS, BN256Adapter.P1().multiply(k), verifierArtifact.multiply(k));
+    }
+
+    /**
+     * @notice Replaces S with updatedS after verifying consistency
+     * @dev The parameters can be obtained directly from the `generateUpdateProof` function.
+     * However, as noted in its function comments, it should be called in a separate transaction
+     * to avoid revealing k.
+     * @param updatedS the updated S values. updatedS[i] should be (s'^i)⋅[P1]
+     * @param proof the value k⋅[P1]. This is used to demonstrate the new secret s' is sk (ie. the original entropy has not been discarded)
+     * @param updatedVerifierArtifact the value s'⋅[P2]. This is used to validate the consistency of the updates
+     */
+    function update(
+        BN256Adapter.PointG1[MAX_DEGREE+1] memory updatedS,
+        BN256Adapter.PointG1 memory proof,
+        BN256Adapter.PointG2 memory updatedVerifierArtifact
+    ) public {
+        BN256Adapter.PairingEquation[] memory equations = new BN256Adapter.PairingEquation[](MAX_DEGREE+1);
+
+        // prove that the updated verifier artifact is (ks)⋅[P2] for some k (ie. the original s has not been discarded)
+        // we're checking the equation
+        //    e(proof, s⋅[P2])*e(-1⋅[P1], updatedVerifierArtifact) = 1
+        // using k and x as the unknown coefficients, this becomes
+        //    e(k⋅[P1], s⋅[P2])*e(-1⋅[P1], x⋅[P2]) = 1
+        // this  should be interpreted as
+        //   (k)(s) + (-1)(x) = 0
+        // => x = ks
+        equations[0] = BN256Adapter.PairingEquation({
+            A: proof, // claimed to be k⋅[P1]
+            B: verifierArtifact, // known to be s⋅[P2]
+            C: BN256Adapter.negP1(), // known to be -1⋅[P1]
+            D: updatedVerifierArtifact // claimed to be (ks)⋅[P2]
+        });
+
+        // the first term is redundant because S[0] never changes (it's always P1)
+        // it's included anyway to simplify the interface
+        require(
+            updatedS[0].x == BN256Adapter.P1().x &&
+            updatedS[0].y == BN256Adapter.P1().y,
+            "Invalid degree zero term. It should be P1"
+        );
+        for(uint256 degree = 1; degree <= MAX_DEGREE; degree++) {
+            // we want to demonstrate that updatedS[degree] = ((ks)^degree)⋅[P1]
+            // we can build this from the previous term by proving that
+            // updatedS[degree] = (ks)*updatedS[degree - 1]
+            // we're checking the equation
+            //    e(((ks)^(degree-1))⋅[P1], (ks)⋅[P2])*e(updatedS[degree], -1⋅[P2]) = 1
+            // using x as the unknown coefficient, this becomes
+            //    e(((ks)^(degree-1))⋅[P1], (ks)⋅[P2])*e(x⋅[P1], -1⋅[P2]) = 1
+            // this should be interpreted as
+            //    (ks)^(degree-1)(ks) + (x)(-1) = 0
+            // => x = (ks)^degree
+            equations[degree] = BN256Adapter.PairingEquation({
+                A: updatedS[degree - 1], // known to be ((ks)^(degree-1))⋅[P1] (assuming equations[degree - 1] holds)
+                B: updatedVerifierArtifact, //known to be (ks)⋅[P2] (assuming equations[0] holds)
+                C: updatedS[degree], // claimed to be ((ks)^degree)⋅[P1]
+                D: BN256Adapter.negP2() // known to be -1⋅[P2]
+            });
+        }
+
+        require(BN256Adapter.verifyPairingEquations(equations), "Cannot update S. Invalid proofs provided");
+
+        verifierArtifact = updatedVerifierArtifact;
+        for(uint256 i = 0; i < updatedS.length; i++) {
+            S[i] = updatedS[i];
+        }
     }
 
     function _modExp(uint256 base, uint256 exponent, uint256 modulus) private view returns (uint256) {

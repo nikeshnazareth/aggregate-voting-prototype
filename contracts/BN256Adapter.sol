@@ -39,10 +39,10 @@ library BN256Adapter {
 
     // represents the equation 1 = e(A, B)*e(C, D)
     struct PairingEquation {
-        PointG1: A;
-        PointG2: B;
-        PointG1: C;
-        PointG2: D;
+        PointG1 A;
+        PointG2 B;
+        PointG1 C;
+        PointG2 D;
     }
 
     /**
@@ -53,6 +53,19 @@ library BN256Adapter {
         return PointG1({
             x: BN256G1.GX,
             y: BN256G1.GY
+        });
+    }
+
+    /**
+     * @dev The generators are defined in EIP197 (https://eips.ethereum.org/EIPS/eip-197)
+     * Due to the curve's symmetry, -(x, y) = (x, -y) so we can obtain -P1 by negating the y value,
+     * which is equivalent to (p - y) when working modulo p
+     * @return The negative of the group 1 (G1) generator
+     */
+    function negP1() public pure returns (PointG1 memory) {
+        return PointG1({
+            x: BN256G1.GX,
+            y: BN256G1.PP - BN256G1.GY
         });
     }
 
@@ -121,18 +134,18 @@ library BN256Adapter {
      */
     function sum(PointG1[] memory Points) public view returns (PointG1 memory) {
         require(Points.length > 0, "Cannot sum empty list");
-        PointG1 memory sum = Points[0];
+        PointG1 memory s = Points[0];
 
         uint256[4] memory input;
         for(uint256 i = 1; i < Points.length; i++) {
             input = abi.decode(
-                abi.encode(sum, Points[i]),
+                abi.encode(s, Points[i]),
                 (uint256[4])
             );
             (uint256 x, uint256 y) = BN256G1.add(input);
-            sum = PointG1({x: x, y: y});
+            s = PointG1({x: x, y: y});
         }
-        return sum;
+        return s;
     }
 
     /**
@@ -143,17 +156,17 @@ library BN256Adapter {
      */
     function sum(PointG2[] memory Points) public view returns (PointG2 memory) {
         require(Points.length > 0, "Cannot sum empty list");
-        PointG2 memory sum = Points[0];
+        PointG2 memory s = Points[0];
 
         for(uint256 i = 1; i < Points.length; i++) {
             (uint256 xr, uint256 xi, uint256 yr, uint256 yi) =
                 BN256G2.ecTwistAdd(
-                    sum.x_real, sum.x_imag, sum.y_real, sum.y_imag,
+                    s.x_real, s.x_imag, s.y_real, s.y_imag,
                     Points[i].x_real, Points[i].x_imag, Points[i].y_real, Points[i].y_imag
                 );
-            sum = PointG2({x_real: xr, x_imag: xi, y_real: yr, y_imag: yi});
+            s = PointG2({x_real: xr, x_imag: xi, y_real: yr, y_imag: yi});
         }
-        return sum;
+        return s;
     }
 
     /**
@@ -208,17 +221,44 @@ library BN256Adapter {
      *    1 = e(A1, B1)*e(C1, D1)*e(r⋅A2, B2)*e(r⋅C2, D2)
      * => 1 = e(A1, B1)*e(C1, D1)*( e(A2, B2)*e(C2, D2) )^r
      * this is more gas-efficient than checking the individual pairings
-     * @param eqns a list of pairing equations to validate
+     * The parameter is an abi encoded string because we don't know the number of equations
+     * at compile time and the contents of a dynamic array are not necessarily stored contiguously
+     * @param equations a list of pairing equations to validate
      * @return whether all equations are satisfied
      */
-    function verifyPairingEquations(PairingEquation[] memory eqns) public view returns (bool) {
-        require(eqns.length > 0, "Cannot verify empty list of pairing equations");
+    function verifyPairingEquations(PairingEquation[] memory equations) public view returns (bool) {
+
+        require(equations.length > 0, "Cannot verify empty list of pairing equations");
+
         // update the equations pseudorandomly, starting at index 1
         uint256 r;
-        for(uint256 i = 1; i < eqns.length; i++) {
-            r = uint256(keccak256(abi.encode(eqns[i])))
-            eqns[i].A = eqns[i].A.multiply(r);
-            eqns[i].C = eqns[i].C.multiply(r);
+        for(uint256 i = 1; i < equations.length; i++) {
+            r = uint256(keccak256(abi.encode(equations[i])));
+            equations[i].A = multiply(equations[i].A, r);
+            equations[i].C = multiply(equations[i].C, r);
         }
+
+        // since PairingEquation contains nested structs, its content includes memory pointers
+        // copy them to a contiguous block of memory to invoke the pairing precompile
+        // this is inefficient, but since this project is illustrative,
+        // the cleaner interface is preferred over efficiency
+        uint256[] memory input = new uint256[](12 * equations.length);
+        uint256 destIdx = 0;
+        for(uint256 i = 0; i < equations.length; i++) {
+            input[destIdx++] = equations[i].A.x;
+            input[destIdx++] = equations[i].A.y;
+            input[destIdx++] = equations[i].B.x_imag;
+            input[destIdx++] = equations[i].B.x_real;
+            input[destIdx++] = equations[i].B.y_imag;
+            input[destIdx++] = equations[i].B.y_real;
+            input[destIdx++] = equations[i].C.x;
+            input[destIdx++] = equations[i].C.y;
+            input[destIdx++] = equations[i].D.x_imag;
+            input[destIdx++] = equations[i].D.x_real;
+            input[destIdx++] = equations[i].D.y_imag;
+            input[destIdx++] = equations[i].D.y_real;
+        }
+
+        return BN256G1.bn256CheckPairingBatch(input);
     }
 }
