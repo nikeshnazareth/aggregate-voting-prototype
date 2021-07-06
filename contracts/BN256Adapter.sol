@@ -183,12 +183,12 @@ library BN256Adapter {
     /**
      * @notice validates whether the inputs correspond to a valid BLS signature
      * @dev the hash of the message can be thought of as H = 𝛿⋅[P1] for an unknown 𝛿
-     * The signature would then be PRIVATE_KEY⋅𝛿⋅[P1]
-     * The public key is given by PRIVATE_KEY⋅[P2]
+     *   The signature would then be PRIVATE_KEY⋅𝛿⋅[P1]
+     *   The public key is given by PRIVATE_KEY⋅[P2]
      * If e is an elliptic curve pairing from G1 x G2 -> GT, the function validates whether
-     * e(H, _publicKey) == e(signature, [P2]) or equivalently,
-     * e(𝛿⋅[P1], PRIVATE_KEY⋅[P2]) == e(PRIVATE_KEY⋅𝛿⋅[P1], [P2])
-     * Both sides should evaluate to PRIVATE_KEY⋅𝛿⋅[PT]
+     *   e(H, _publicKey) == e(signature, [P2]) or equivalently,
+     *   e(𝛿⋅[P1], PRIVATE_KEY⋅[P2]) == e(PRIVATE_KEY⋅𝛿⋅[P1], [P2])
+     *   Both sides should evaluate to PRIVATE_KEY⋅𝛿⋅[PT]
      * @param _message the message that was signed
      * @param _signature the signature of the message
      * @param _publicKey the public key corresponding to the private key that signed the message
