@@ -18,6 +18,9 @@ The main disadvantages are:
 - Wallets that support BLS signatures are uncommon within the Ethereum ecosystem. There is minimal advantage to aggregating votes if the contract needs to validate individual ECDSA signatures (although there may still be a modest gas saving as a result of avoiding storage lookups to retrieve the balances).
 - Kate commitments rely on infrastructure (a trusted setup and elliptic curve precompiles) that is not fully mature in the Ethereum ecosystem. It should be noted that the infrastructure is being developed anyway to support ETH 2.0 and SNARKs.
 - There are some loopholes in the design that need to be closed, ideally by someone with more experience than me.
+- There are several potential complications, depending on the implementation details, when using this mechanism with existing ERC20 tokens.
+
+Separately, Kate commitments permit a different optimization: the corresponding data (eg. the user balances) can be stored off-chain and supplied to the contract when needed. The contract can validate that the data is correct in constant time. This is entirely optional. For demonstration purposes, the contracts in this repository use this feature.
 
 ## Usage
 
