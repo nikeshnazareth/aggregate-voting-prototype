@@ -133,7 +133,7 @@ contract TrustedSetup {
             // => x = (ks)^degree
             equations[degree] = BN256Adapter.PairingEquation({
                 A: updatedS[degree - 1], // known to be ((ks)^(degree-1))⋅[P1] (assuming equations[degree - 1] holds)
-                B: updatedVerifierArtifact, //known to be (ks)⋅[P2] (assuming equations[0] holds)
+                B: updatedVerifierArtifact, // known to be (ks)⋅[P2] (assuming equations[0] holds)
                 C: updatedS[degree], // claimed to be ((ks)^degree)⋅[P1]
                 D: BN256Adapter.negP2() // known to be -1⋅[P2]
             });
