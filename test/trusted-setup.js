@@ -115,7 +115,7 @@ describe("Trusted Setup", function () {
           aliceProof,
           aliceVerifierArtifact
         );
-        expect(update).to.be.reverted;
+        expect(update).to.be.revertedWith("Invalid degree zero term. It should be P1");
       });
     });
 
@@ -137,7 +137,7 @@ describe("Trusted Setup", function () {
           aliceProof,
           aliceVerifierArtifact
         );
-        expect(update).to.be.reverted;
+        expect(update).to.be.revertedWith("Cannot update S. Invalid proofs provided");
       });
     });
 
@@ -240,7 +240,7 @@ describe("Trusted Setup", function () {
               bobProof_solo,
               bobVerifierArtifact_solo
             );
-            expect(update).to.be.reverted;
+            expect(update).to.be.revertedWith("Cannot update S. Invalid proofs provided");
           });
         });
       });
