@@ -18,5 +18,14 @@ task("accounts", "Prints the list of accounts", async () => {
  */
 module.exports = {
   solidity: "0.6.12",
+  networks: {
+    hardhat: {
+      // generating an update proof for the Trusted Setup consumes too much gas
+      // this is not a problem in practice because it's a `view` function
+      // and a real-world trusted setup is not going to use the EVM
+      // this increases the gas limit so the test suite can complete
+      blockGasLimit:10**8
+    }
+  }
 };
 
