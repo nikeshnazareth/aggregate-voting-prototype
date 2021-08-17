@@ -103,7 +103,7 @@ describe("Trusted Setup", function () {
 
     it("should generate the powers of k in group G2", async function () {
       console.log(
-        "NOTE: computing the G2 test comparison takes 15 seconds)..."
+        "NOTE: computing the G2 test comparison takes 15 seconds..."
       );
       expect(aliceUpdatedS2.length).to.equal(MAX_DEGREE + 1);
       expect(aliceUpdatedS2[0]).to.deep.equal(P2);
