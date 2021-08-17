@@ -13,6 +13,9 @@
     "hardhat": "^2.4.1",
     "truffle": "^5.3.14"
   },
+  "scripts": {
+    "test": "npx hardhat test"
+  },
   "dependencies": {
     "@openzeppelin/contracts": "^3.4.0",
     "elliptic-curve-solidity": "0.2.2"
