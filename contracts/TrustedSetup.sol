@@ -41,11 +41,11 @@ contract TrustedSetup {
 
     // the powers of the secret value s in group G1
     // S1[i] = (s^i)⋅[P1]
-    BN256Adapter.PointG1[MAX_DEGREE + 1] public S1;
+    BN256Adapter.PointG1[MAX_DEGREE + 1] internal S1Powers;
 
     // the powers of the secret value s in group G2
     // S2[i] = (s^i)⋅[P2]
-    BN256Adapter.PointG2[MAX_DEGREE + 1] public S2;
+    BN256Adapter.PointG2[MAX_DEGREE + 1] internal S2Powers;
 
     /**
      * @notice Initialize all S1 values to P1 and all S2 values to P2,
@@ -53,9 +53,35 @@ contract TrustedSetup {
      */
     constructor() public {
         for(uint256 i = 0; i <= MAX_DEGREE; i++) {
-            S1[i] = BN256Adapter.P1();
-            S2[i] = BN256Adapter.P2();
+            S1Powers[i] = BN256Adapter.P1();
+            S2Powers[i] = BN256Adapter.P2();
         }
+    }
+
+    /**
+     * @notice Returns the secret value at the specified index
+     * @dev the secret is equal to (s^index)⋅[P1]
+     * Instead of making S1Powers public with a default getter, this function allows
+     * contracts to treat the return value as a PointG1 struct
+     * @param index the index of the secret to retrieve
+     * @return the corresponding secret in group 1
+     */
+    function S1(uint256 index) public view returns (BN256Adapter.PointG1 memory) {
+        require(index < S1Powers.length, "Index exceeds trusted setup size");
+        return S1Powers[index];
+    }
+
+    /**
+     * @notice Returns the secret value at the specified index
+     * @dev the secret is equal to (s^index)⋅[P2]
+     * Instead of making S2Powers public with a default getter, this function allows
+     * contracts to treat the return value as a PointG2 struct
+     * @param index the index of the secret to retrieve
+     * @return the corresponding secret in group 2
+     */
+    function S2(uint256 index) public view returns (BN256Adapter.PointG2 memory) {
+        require(index < S2Powers.length, "Index exceeds trusted setup size");
+        return S2Powers[index];
     }
 
     /**
@@ -80,8 +106,8 @@ contract TrustedSetup {
         uint256 powerOfK;
         for (uint256 degree = 0; degree <= MAX_DEGREE; degree++) {
             powerOfK = _modExp(k, degree, BN256Adapter.GROUP_ORDER);
-            updatedS1[degree] = S1[degree].multiply(powerOfK);
-            updatedS2[degree] = S2[degree].multiply(powerOfK);
+            updatedS1[degree] = S1(degree).multiply(powerOfK);
+            updatedS2[degree] = S2(degree).multiply(powerOfK);
         }
 
         return (updatedS1, updatedS2, BN256Adapter.P1().multiply(k));
@@ -113,7 +139,7 @@ contract TrustedSetup {
         // => x = ks
         equations[0] = BN256Adapter.PairingEquation({
             A: proof, // claimed to be k⋅[P1]
-            B: S2[1], // known to be s⋅[P2]
+            B: S2(1), // known to be s⋅[P2]
             C: BN256Adapter.negP1(), // known to be -1⋅[P1]
             D: updatedS2[1] // claimed to be (ks)⋅[P2]
         });
@@ -151,7 +177,7 @@ contract TrustedSetup {
                 D: BN256Adapter.negP2() // known to be -1⋅[P2]
             });
         }
-        // start at degree 2 because we alreay checked S2[1] in equations[0]
+        // start at degree 2 because we alreay checked updatedS2[1] in equations[0]
         for(uint256 degree = 2; degree <= MAX_DEGREE; degree++){
             // we want to demonstrate that updatedS2[degree] = ((ks)^degree)⋅[P2]
             // we can simply compare it to ((ks)^degree)⋅[P1]
@@ -173,8 +199,8 @@ contract TrustedSetup {
         require(BN256Adapter.verifyPairingEquations(equations), "Cannot update S. Invalid proofs provided");
 
         for(uint256 i = 0; i <= MAX_DEGREE; i++) {
-            S1[i] = updatedS1[i];
-            S2[i] = updatedS2[i];
+            S1Powers[i] = updatedS1[i];
+            S2Powers[i] = updatedS2[i];
         }
     }
 
