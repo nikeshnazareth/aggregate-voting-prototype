@@ -20,7 +20,7 @@ The main disadvantages are:
 - There are some loopholes in the design that need to be closed, ideally by someone with more experience than me.
 - There are several potential complications, depending on the implementation details, when using this mechanism with existing ERC20 tokens.
 
-Separately, Kate commitments permit a different optimization: the corresponding data (eg. the user balances) can be stored off-chain and supplied to the contract when needed. The contract can validate that the data is correct in constant time. This is entirely optional. For demonstration purposes, the contracts in this repository use this feature.
+Separately, Kate commitments permit a different optimization: the corresponding data (eg. the user balances) can be stored off-chain and supplied to the contract when needed. The contract can validate that the data is correct in constant time. This is entirely optional and only makes sense for operations that access lots of storage locations (so the cost of the accesses exceeds the data verification costs).
 
 ## Usage
 
