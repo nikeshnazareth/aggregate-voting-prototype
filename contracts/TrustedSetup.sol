@@ -186,7 +186,7 @@ contract TrustedSetup {
             // using x as the unknown coefficient, this becomes
             //   e(((ks)^degree)⋅[P1], -1⋅[P2])*e(1⋅[P1], x⋅[P2]) = 1
             // this should be interpreted as
-            //   ((ks)^degree)(-1) + (1)(x) = 1
+            //   ((ks)^degree)(-1) + (1)(x) = 0
             // => x = (ks)^degree
             equations[MAX_DEGREE + degree - 1] = BN256Adapter.PairingEquation({
                 A: updatedS1[degree], // known to be ((ks)^degree)⋅[P1] (assuming equations[degree] holds)
