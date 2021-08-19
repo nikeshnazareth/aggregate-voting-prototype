@@ -124,6 +124,9 @@ contract CommitmentToken is PolynomialCommitment, ERC20 {
 
         uint256 index = nextFreeIndex.current();
         nextFreeIndex.increment();
+
+        // In a production deployment, we could start another Commitment instead
+        require(index < DATA_ARRAY_SIZE, "Too many registered users");
         indexOf[msg.sender] = index;
 
         // before adding the encoded key to the KeysCommitment, we should ensure
@@ -148,7 +151,14 @@ contract CommitmentToken is PolynomialCommitment, ERC20 {
         keyComms[1] = encodedKey;
         KeysCommitment = BN256Adapter.sum(keyComms);
 
-        // TODO: update BalancesCommitment
+        // add the user's balance to the balances commitment
+        uint256 balance = balanceOf(msg.sender);
+        if (balance != 0) {
+            BN256Adapter.PointG1[] memory balanceComms = new BN256Adapter.PointG1[](2);
+            balanceComms[0] = BalancesCommitment;
+            balanceComms[1] = BN256Adapter.multiply(trustedSetup.S1(index), balance);
+            BalancesCommitment = BN256Adapter.sum(balanceComms);
+        }
     }
 
     /**

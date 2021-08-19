@@ -1,6 +1,6 @@
 const { expect } = require("chai");
 
-describe("Commitment Token", function () {
+describe.only("Commitment Token", function () {
   const TOKEN_NAME = "Commitment Token";
   const TOKEN_SYMBOL = "CMT";
   const INITIAL_SUPPLY = ethers.BigNumber.from(10).pow(18).mul(1000); //1000e18
@@ -9,10 +9,10 @@ describe("Commitment Token", function () {
     "0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001"
   );
 
-  let alice, aliceWallet, bob, bobWallet, token, setup, helper, s;
+  let alice, aliceWallet, bob, bobWallet, charlie, token, setup, helper, s;
 
   this.beforeAll(async function () {
-    [alice, bob] = await ethers.getSigners();
+    [alice, bob, charlie] = await ethers.getSigners();
 
     BN256Adapter = await ethers.getContractFactory("BN256Adapter");
     adapter = await BN256Adapter.deploy();
@@ -143,6 +143,14 @@ describe("Commitment Token", function () {
       it("should set the keys commitment to the encoded key", async function () {
         const keysComm = await token.KeysCommitment();
         expect(keysComm).to.deep.equal(encodedKey);
+      });
+
+      it("should set the balances commitment to match array [1000e18, 0, 0, ... ]", async function() {
+        const balancesComm = await token.BalancesCommitment();
+        const P1 = await adapter.P1();
+        const coefficient = ethers.BigNumber.from(s).mul(INITIAL_SUPPLY).mod(GROUP_ORDER);
+        const expected = await helper.multiplyG1(P1, coefficient)
+        expect(balancesComm).to.deep.equal(expected);
       });
     });
 

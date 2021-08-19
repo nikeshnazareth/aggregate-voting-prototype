@@ -1,3 +1,4 @@
+//SPDX-License-Identifier: MIT
 pragma solidity ^0.6.0;
 pragma experimental ABIEncoderV2;
 
@@ -61,6 +62,7 @@ contract PolynomialCommitment {
      */
     function _commitSingleValueG1(uint256 value, uint256 index)
         internal
+        view
         returns (BN256Adapter.PointG1 memory)
     {
         // In a production system, the contract could create more commitments
@@ -80,6 +82,7 @@ contract PolynomialCommitment {
      */
     function _commitSingleValueG2(uint256 value, uint256 index)
         internal
+        view
         returns (BN256Adapter.PointG2 memory)
     {
         // In a production system, the contract could create more commitments
@@ -113,7 +116,7 @@ contract PolynomialCommitment {
         uint256 index,
         BN256Adapter.PointG2 memory first,
         BN256Adapter.PointG2 memory last
-    ) internal returns (BN256Adapter.PairingEquation[2] memory) {
+    ) internal view returns (BN256Adapter.PairingEquation[2] memory) {
         return [
             _isShiftEquation(first, valueCommitment, index),
             _isShiftEquation(first, last, trustedSetup.MAX_DEGREE())
@@ -133,12 +136,9 @@ contract PolynomialCommitment {
         BN256Adapter.PointG2 memory left,
         BN256Adapter.PointG2 memory right,
         uint256 delta
-    ) internal returns (BN256Adapter.PairingEquation memory) {
+    ) internal view returns (BN256Adapter.PairingEquation memory) {
         // meaningful data arrays are restricted to DATA_ARRAY_SIZE, but safety checks span the whole MAX_DEGREE
-        require(
-            delta <= trustedSetup.MAX_DEGREE(),
-            "array shift too large for trusted setup"
-        );
+        require(delta <= trustedSetup.MAX_DEGREE(), "array shift too large for trusted setup");
 
         // if L is a data array [ d0, d1, d2, ... ] then its commitment is
         // left = l⋅[P2] where l = d0 + (d1)(s) + (d2)(s^2) + ...
