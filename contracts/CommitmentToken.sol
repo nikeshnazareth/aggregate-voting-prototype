@@ -128,14 +128,13 @@ contract CommitmentToken is PolynomialCommitment, ERC20 {
 
         // before adding the encoded key to the KeysCommitment, we should ensure
         // that it only affects the record at the specified index
-
-
-            BN256Adapter.PairingEquation[] memory equations
-         = new BN256Adapter.PairingEquation[](2);
-
-
-            BN256Adapter.PairingEquation[2] memory keysEqns
-         = _isSingleValueEquations(encodedKey, index, key, encodingArtifact);
+        BN256Adapter.PairingEquation[] memory equations = new BN256Adapter.PairingEquation[](2);
+        BN256Adapter.PairingEquation[2] memory keysEqns = _isSingleValueEquations(
+            encodedKey,
+            index,
+            key,
+            encodingArtifact
+        );
         equations[0] = keysEqns[0];
         equations[1] = keysEqns[1];
         require(
