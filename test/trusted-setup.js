@@ -1,5 +1,8 @@
 const { expect } = require("chai");
 
+// WARNING: To avoid excess repetition, some tests have side-effects that are used to initialize subsequent tests
+// Running a subset of the tests may produce unexpected results
+
 describe("Trusted Setup", function () {
   let adapter;
   let setup;

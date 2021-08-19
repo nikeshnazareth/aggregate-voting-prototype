@@ -54,11 +54,11 @@ contract CommitmentToken is PolynomialCommitment, ERC20 {
     uint256 public constant INITIAL_SUPPLY = 1000e18;
 
     // The Kate commitment representing an ordered list of user balances
-    BN256Adapter.PointG1 public BalancesCommitment;
+    BN256Adapter.PointG1 internal _balancesCommitment;
 
     // The Kate commitment representing an ordered list of user BLS public keys.
     // The key at position i is authorized to vote with the tokens at position i in BalancesCommitment
-    BN256Adapter.PointG2 public KeysCommitment;
+    BN256Adapter.PointG2 internal _keysCommitment;
 
     // The first free position in both commitments. It is initialized to 1.
     // We avoid position 0 to ensure indexOf[address] is non-zero for all known addresses
@@ -92,6 +92,26 @@ contract CommitmentToken is PolynomialCommitment, ERC20 {
      */
     function nextIndex() public view returns (uint256) {
         return nextFreeIndex.current();
+    }
+
+    /**
+     * @notice Returns the Kate commitment that tracks user balances
+     * @dev Instead of making _balancesCommitment public with a default getter, this function
+     * allows contracts to treat the return value as a PointG1 struct
+     * @return the balances commitment
+     */
+    function BalancesCommitment() public view returns (BN256Adapter.PointG1 memory) {
+        return _balancesCommitment;
+    }
+
+    /**
+     * @notice Returns the Kate commitment that tracks user BLS keys
+     * @dev Instead of making _keysCommitment public with a default getter, this function
+     * allows contracts to treat the return value as a PointG2 struct
+     * @return the balances commitment
+     */
+    function KeysCommitment() public view returns (BN256Adapter.PointG2 memory) {
+        return _keysCommitment;
     }
 
     /**
@@ -147,17 +167,17 @@ contract CommitmentToken is PolynomialCommitment, ERC20 {
 
         // add the encoded key to the keys commitment
         BN256Adapter.PointG2[] memory keyComms = new BN256Adapter.PointG2[](2);
-        keyComms[0] = KeysCommitment;
+        keyComms[0] = _keysCommitment;
         keyComms[1] = encodedKey;
-        KeysCommitment = BN256Adapter.sum(keyComms);
+        _keysCommitment = BN256Adapter.sum(keyComms);
 
         // add the user's balance to the balances commitment
         uint256 balance = balanceOf(msg.sender);
         if (balance != 0) {
             BN256Adapter.PointG1[] memory balanceComms = new BN256Adapter.PointG1[](2);
-            balanceComms[0] = BalancesCommitment;
+            balanceComms[0] = _balancesCommitment;
             balanceComms[1] = BN256Adapter.multiply(trustedSetup.S1(index), balance);
-            BalancesCommitment = BN256Adapter.sum(balanceComms);
+            _balancesCommitment = BN256Adapter.sum(balanceComms);
         }
     }
 
@@ -192,24 +212,30 @@ contract CommitmentToken is PolynomialCommitment, ERC20 {
      * @param to the recipient address (zero for burning)
      * @param amount the amount of tokens to transfer
      */
-    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override {
-        if(amount == 0) {
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal override {
+        if (amount == 0) {
             return;
         }
 
         BN256Adapter.PointG1[] memory balanceComms = new BN256Adapter.PointG1[](2);
-        if(indexOf[from] != 0) {
+        if (indexOf[from] != 0) {
             // reduce the corresponding entry in the Balances commitment
-            balanceComms[0] = BalancesCommitment;
-            balanceComms[1] = BN256Adapter.neg(BN256Adapter.multiply(trustedSetup.S1(indexOf[from]), amount));
-            BalancesCommitment = BN256Adapter.sum(balanceComms);
+            balanceComms[0] = _balancesCommitment;
+            balanceComms[1] = BN256Adapter.neg(
+                BN256Adapter.multiply(trustedSetup.S1(indexOf[from]), amount)
+            );
+            _balancesCommitment = BN256Adapter.sum(balanceComms);
         }
 
-        if(indexOf[to] != 0) {
+        if (indexOf[to] != 0) {
             // increase the corresponding entry in the Balances commitment
-            balanceComms[0] = BalancesCommitment;
+            balanceComms[0] = _balancesCommitment;
             balanceComms[1] = BN256Adapter.multiply(trustedSetup.S1(indexOf[to]), amount);
-            BalancesCommitment = BN256Adapter.sum(balanceComms);
+            _balancesCommitment = BN256Adapter.sum(balanceComms);
         }
     }
 }
