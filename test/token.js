@@ -1,6 +1,6 @@
 const { expect } = require("chai");
 
-describe.only("Commitment Token", function () {
+describe("Commitment Token", function () {
   const TOKEN_NAME = "Commitment Token";
   const TOKEN_SYMBOL = "CMT";
   const INITIAL_SUPPLY = ethers.BigNumber.from(10).pow(18).mul(1000); //1000e18

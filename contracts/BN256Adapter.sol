@@ -6,24 +6,24 @@ import "./BN256G1.sol";
 import "./BN256G2.sol";
 
 /**
- * The BN256G1 and BN256G2 libraries provides convenience functions to perform 
+ * The BN256G1 and BN256G2 libraries provides convenience functions to perform
  * elliptic curve operations. However, the interface is optimized for efficiency
- * rather than clarity. Since the goal of this prototype is to explain the 
- * Aggregate Voting proposal, a more descriptive interface is preferable. 
+ * rather than clarity. Since the goal of this prototype is to explain the
+ * Aggregate Voting proposal, a more descriptive interface is preferable.
  * This library provides that interface.
  *
  * Note that the EIP2537 (https://eips.ethereum.org/EIPS/eip-2537) will add support for
  * new precompiles that will remove the need for an elliptic curve library.
- * In particular, EIP-196 (https://eips.ethereum.org/EIPS/eip-196) and 
+ * In particular, EIP-196 (https://eips.ethereum.org/EIPS/eip-196) and
  * EIP197 (https://eips.ethereum.org/EIPS/eip-197) introduced precompiles for the BN256
- * curve, but they only support addition and multiplication operations on the G1 group 
+ * curve, but they only support addition and multiplication operations on the G1 group
  * used in the pairing. EIP2537 supports the BLS12-381 curve, and also introduces precompiles
  * for addition and multiplication on the G2 group.
  */
 library BN256Adapter {
-
     // the q value in EIP-197 (https://eips.ethereum.org/EIPS/eip-197)
-    uint256 constant internal GROUP_ORDER = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
+    uint256
+        internal constant GROUP_ORDER = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
     struct PointG1 {
         uint256 x;
@@ -50,53 +50,63 @@ library BN256Adapter {
      * @return The group 1 (G1) generator
      */
     function P1() public pure returns (PointG1 memory) {
-        return PointG1({
-            x: BN256G1.GX,
-            y: BN256G1.GY
-        });
+        return PointG1({x: BN256G1.GX, y: BN256G1.GY});
     }
 
     /**
      * @dev The generators are defined in EIP197 (https://eips.ethereum.org/EIPS/eip-197)
-     * Due to the curve's symmetry, -(x, y) = (x, -y) so we can obtain -P1 by negating the y value,
-     * which is equivalent to (p - y) when working modulo p
      * @return The negative of the group 1 (G1) generator
      */
     function negP1() public pure returns (PointG1 memory) {
-        return PointG1({
-            x: BN256G1.GX,
-            y: BN256G1.PP - BN256G1.GY
-        });
+        return neg(P1());
     }
 
     /**
      * @dev The generators are defined in EIP197 (https://eips.ethereum.org/EIPS/eip-197)
      * The BN256G2 library defines negative P2 because that simplifies pairing
-     * Due to the curve's symmetry, -(x, y) = (x, -y) so we can recover P2 by negating the y value,
-     * which is equivalent to (p - y) when working modulo p 
      * @return The group 2 (G2) generator
      */
     function P2() public pure returns (PointG2 memory) {
-        return PointG2({
-            x_imag: BN256G2.G2_NEG_X_IM,
-            x_real: BN256G2.G2_NEG_X_RE,
-            y_imag: BN256G2.FIELD_MODULUS - BN256G2.G2_NEG_Y_IM,
-            y_real: BN256G2.FIELD_MODULUS - BN256G2.G2_NEG_Y_RE
-        });
+        return neg(negP2());
     }
 
-/**
+    /**
      * @dev The generators are defined in EIP197 (https://eips.ethereum.org/EIPS/eip-197)
      * The BN256G2 library defines negative P2 because that simplifies pairing
      * @return The negative of the group 2 (G2) generator
      */
     function negP2() public pure returns (PointG2 memory) {
-        return PointG2({
-            x_imag: BN256G2.G2_NEG_X_IM,
-            x_real: BN256G2.G2_NEG_X_RE,
-            y_imag: BN256G2.G2_NEG_Y_IM,
-            y_real: BN256G2.G2_NEG_Y_RE
-        });
+        return
+            PointG2({
+                x_imag: BN256G2.G2_NEG_X_IM,
+                x_real: BN256G2.G2_NEG_X_RE,
+                y_imag: BN256G2.G2_NEG_Y_IM,
+                y_real: BN256G2.G2_NEG_Y_RE
+            });
+    }
+
+    /**
+     * @dev Due to the curve's symmetry, -(x, y) = (x, -y) so we can simply negate the y value,
+     * which is equivalent to (p - y) when working modulo p
+     * @return the negative of the point
+     */
+    function neg(PointG1 memory Point) public pure returns (PointG1 memory) {
+        return PointG1({x: Point.x, y: BN256G1.PP - Point.y});
+    }
+
+    /**
+     * @dev Due to the curve's symmetry, -(x, y) = (x, -y) so we can simply negate the y value,
+     * which is equivalent to (p - yc) for each component yc of y when working modulo p
+     * @return the negative of the point
+     */
+    function neg(PointG2 memory Point) public pure returns (PointG2 memory) {
+        return
+            PointG2({
+                x_imag: Point.x_imag,
+                x_real: Point.x_real,
+                y_imag: BN256G2.FIELD_MODULUS - Point.y_imag,
+                y_real: BN256G2.FIELD_MODULUS - Point.y_real
+            });
     }
 
     /**
@@ -106,10 +116,7 @@ library BN256Adapter {
      * @return the G1 point (scalar * Point)
      */
     function multiply(PointG1 memory Point, uint256 scalar) public view returns (PointG1 memory) {
-        uint256[3] memory input = abi.decode(
-            abi.encode(Point, scalar % GROUP_ORDER),
-            (uint256[3])
-        );
+        uint256[3] memory input = abi.decode(abi.encode(Point, scalar % GROUP_ORDER), (uint256[3]));
         (uint256 x, uint256 y) = BN256G1.multiply(input);
         return PointG1({x: x, y: y});
     }
@@ -121,8 +128,13 @@ library BN256Adapter {
      * @return the G2 point (scalar * Point)
      */
     function multiply(PointG2 memory Point, uint256 scalar) public view returns (PointG2 memory) {
-        (uint256 xr, uint256 xi, uint256 yr, uint256 yi) = 
-            BN256G2.ecTwistMul(scalar %  GROUP_ORDER, Point.x_real, Point.x_imag, Point.y_real, Point.y_imag);
+        (uint256 xr, uint256 xi, uint256 yr, uint256 yi) = BN256G2.ecTwistMul(
+            scalar % GROUP_ORDER,
+            Point.x_real,
+            Point.x_imag,
+            Point.y_real,
+            Point.y_imag
+        );
         return PointG2({x_real: xr, x_imag: xi, y_real: yr, y_imag: yi});
     }
 
@@ -137,11 +149,8 @@ library BN256Adapter {
         PointG1 memory s = Points[0];
 
         uint256[4] memory input;
-        for(uint256 i = 1; i < Points.length; i++) {
-            input = abi.decode(
-                abi.encode(s, Points[i]),
-                (uint256[4])
-            );
+        for (uint256 i = 1; i < Points.length; i++) {
+            input = abi.decode(abi.encode(s, Points[i]), (uint256[4]));
             (uint256 x, uint256 y) = BN256G1.add(input);
             s = PointG1({x: x, y: y});
         }
@@ -158,12 +167,17 @@ library BN256Adapter {
         require(Points.length > 0, "Cannot sum empty list");
         PointG2 memory s = Points[0];
 
-        for(uint256 i = 1; i < Points.length; i++) {
-            (uint256 xr, uint256 xi, uint256 yr, uint256 yi) =
-                BN256G2.ecTwistAdd(
-                    s.x_real, s.x_imag, s.y_real, s.y_imag,
-                    Points[i].x_real, Points[i].x_imag, Points[i].y_real, Points[i].y_imag
-                );
+        for (uint256 i = 1; i < Points.length; i++) {
+            (uint256 xr, uint256 xi, uint256 yr, uint256 yi) = BN256G2.ecTwistAdd(
+                s.x_real,
+                s.x_imag,
+                s.y_real,
+                s.y_imag,
+                Points[i].x_real,
+                Points[i].x_imag,
+                Points[i].y_real,
+                Points[i].y_imag
+            );
             s = PointG2({x_real: xr, x_imag: xi, y_real: yr, y_imag: yi});
         }
         return s;
@@ -194,7 +208,11 @@ library BN256Adapter {
      * @param _publicKey the public key corresponding to the private key that signed the message
      * @return whether the signature is valid
      */
-    function verify(bytes memory _message, PointG1 memory _signature, PointG2 memory _publicKey) public view returns (bool) {
+    function verify(
+        bytes memory _message,
+        PointG1 memory _signature,
+        PointG2 memory _publicKey
+    ) public view returns (bool) {
         PointG1 memory msgHash = hashToG1(_message);
 
         // `bn256CheckPairing` evaluates whether the two points multiply to 1 (they are inverses)
@@ -227,12 +245,11 @@ library BN256Adapter {
      * @return whether all equations are satisfied
      */
     function verifyPairingEquations(PairingEquation[] memory equations) public view returns (bool) {
-
         require(equations.length > 0, "Cannot verify empty list of pairing equations");
 
         // update the equations pseudorandomly, starting at index 1
         uint256 r;
-        for(uint256 i = 1; i < equations.length; i++) {
+        for (uint256 i = 1; i < equations.length; i++) {
             r = uint256(keccak256(abi.encode(equations[i])));
             equations[i].A = multiply(equations[i].A, r);
             equations[i].C = multiply(equations[i].C, r);
@@ -244,7 +261,7 @@ library BN256Adapter {
         // the cleaner interface is preferred over efficiency
         uint256[] memory input = new uint256[](12 * equations.length);
         uint256 destIdx = 0;
-        for(uint256 i = 0; i < equations.length; i++) {
+        for (uint256 i = 0; i < equations.length; i++) {
             input[destIdx++] = equations[i].A.x;
             input[destIdx++] = equations[i].A.y;
             input[destIdx++] = equations[i].B.x_imag;
