@@ -184,4 +184,32 @@ contract CommitmentToken is PolynomialCommitment, ERC20 {
             trustedSetup.S2(trustedSetup.MAX_DEGREE())
         );
     }
+
+    /**
+     * @notice update the BalancesCommitment whenever token balances change
+     * @dev this is called before every transfer, mint or burn operation
+     * @param from the source address (zero for minting)
+     * @param to the recipient address (zero for burning)
+     * @param amount the amount of tokens to transfer
+     */
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override {
+        if(amount == 0) {
+            return;
+        }
+
+        BN256Adapter.PointG1[] memory balanceComms = new BN256Adapter.PointG1[](2);
+        if(indexOf[from] != 0) {
+            // reduce the corresponding entry in the Balances commitment
+            balanceComms[0] = BalancesCommitment;
+            balanceComms[1] = BN256Adapter.neg(BN256Adapter.multiply(trustedSetup.S1(indexOf[from]), amount));
+            BalancesCommitment = BN256Adapter.sum(balanceComms);
+        }
+
+        if(indexOf[to] != 0) {
+            // increase the corresponding entry in the Balances commitment
+            balanceComms[0] = BalancesCommitment;
+            balanceComms[1] = BN256Adapter.multiply(trustedSetup.S1(indexOf[to]), amount);
+            BalancesCommitment = BN256Adapter.sum(balanceComms);
+        }
+    }
 }

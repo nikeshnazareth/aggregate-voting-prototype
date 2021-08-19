@@ -9,7 +9,7 @@ describe("Commitment Token", function () {
     "0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001"
   );
 
-  let alice, aliceWallet, bob, bobWallet, charlie, token, setup, helper, s;
+  let alice, aliceWallet, bob, bobWallet, token, setup, helper, s;
 
   this.beforeAll(async function () {
     [alice, bob, charlie] = await ethers.getSigners();
@@ -145,11 +145,13 @@ describe("Commitment Token", function () {
         expect(keysComm).to.deep.equal(encodedKey);
       });
 
-      it("should set the balances commitment to match array [1000e18, 0, 0, ... ]", async function() {
+      it("should set the balances commitment to match array [0, 1000e18, 0, 0, ... ]", async function () {
         const balancesComm = await token.BalancesCommitment();
         const P1 = await adapter.P1();
-        const coefficient = ethers.BigNumber.from(s).mul(INITIAL_SUPPLY).mod(GROUP_ORDER);
-        const expected = await helper.multiplyG1(P1, coefficient)
+        const coefficient = ethers.BigNumber.from(s)
+          .mul(INITIAL_SUPPLY)
+          .mod(GROUP_ORDER);
+        const expected = await helper.multiplyG1(P1, coefficient);
         expect(balancesComm).to.deep.equal(expected);
       });
     });
@@ -159,6 +161,34 @@ describe("Commitment Token", function () {
         const registrationTx = token.register(pk, encodedKey, encodingArtifact);
         expect(registrationTx).to.be.revertedWith("User already has a BLS key");
       });
+    });
+  });
+
+  describe("Alice transfers 100 tokens to Bob", async function () {
+    const AMOUNT = ethers.BigNumber.from(10).pow(18).mul(100); //100e18
+
+    this.beforeAll(async function () {
+      await token.connect(alice).transfer(bob.address, AMOUNT);
+    });
+
+    it("should reduce Alice's balance to 900", async function () {
+      const balance = await token.balanceOf(alice.address);
+      expect(balance).to.equal(INITIAL_SUPPLY.sub(AMOUNT));
+    });
+
+    it("should increase Bob's balance to 100", async function () {
+      const balance = await token.balanceOf(bob.address);
+      expect(balance).to.equal(AMOUNT);
+    });
+
+    it("should set the balances commitment to match array [0, 900e18, 0, 0, ... ]", async function () {
+      const balancesComm = await token.BalancesCommitment();
+      const P1 = await adapter.P1();
+      const coefficient = ethers.BigNumber.from(s)
+        .mul(INITIAL_SUPPLY.sub(AMOUNT))
+        .mod(GROUP_ORDER);
+      const expected = await helper.multiplyG1(P1, coefficient);
+      expect(balancesComm).to.deep.equal(expected);
     });
   });
 
@@ -216,7 +246,9 @@ describe("Commitment Token", function () {
       });
 
       it("should fail to register", async function () {
-        const registrationTx = token.connect(bob).register(pk, shifted, encodingArtifact);
+        const registrationTx = token
+          .connect(bob)
+          .register(pk, shifted, encodingArtifact);
         expect(registrationTx).to.be.revertedWith(
           "Cannot register key. Invalid proof provided"
         );
@@ -231,24 +263,83 @@ describe("Commitment Token", function () {
         await token.connect(bob).register(pk, encodedKey, encodingArtifact);
       });
 
-      describe("indexOf[Bob]", async function() {
-        it("should return 2", async function() {
-          const i = await token.indexOf(bob.address)
+      describe("indexOf[Bob]", async function () {
+        it("should return 2", async function () {
+          const i = await token.indexOf(bob.address);
         });
       });
 
-      describe("nextIndex()", async function() {
-        it("should return 3", async function() {
+      describe("nextIndex()", async function () {
+        it("should return 3", async function () {
           const next = await token.nextIndex();
           expect(next).to.equal(3);
         });
       });
 
-      it("should add Bob's encoded key to the keys commitment", async function() {
+      it("should add Bob's encoded key to the keys commitment", async function () {
         const keysComm = await token.KeysCommitment();
-        const combinedComms = await helper.sumG2([ previousKeysComm, encodedKey]);
+        const combinedComms = await helper.sumG2([
+          previousKeysComm,
+          encodedKey,
+        ]);
         expect(keysComm).to.deep.equal(combinedComms);
       });
+
+      it("should set the balances commitment to match array [0, 900e18, 100e18, 0, ... ]", async function () {
+        const balancesComm = await token.BalancesCommitment();
+        const P1 = await adapter.P1();
+        // 900e18 * s
+        const aliceCoefficient = ethers.BigNumber.from(s)
+          .mul(ethers.BigNumber.from(10).pow(18).mul(900))
+          .mod(GROUP_ORDER);
+        const aliceComm = await helper.multiplyG1(P1, aliceCoefficient);
+        // 100e18 * s^2
+        const bobCoefficient = ethers.BigNumber.from(s)
+          .pow(2)
+          .mod(GROUP_ORDER)
+          .mul(ethers.BigNumber.from(10).pow(18).mul(100))
+          .mod(GROUP_ORDER);
+        const bobComm = await helper.multiplyG1(P1, bobCoefficient);
+        const expected = await helper.sumG1([aliceComm, bobComm]);
+        expect(balancesComm).to.deep.equal(expected);
+      });
+    });
+  });
+
+  describe("Bob transfers 50 tokens to Alice", async function () {
+    const AMOUNT = ethers.BigNumber.from(10).pow(18).mul(50); //100e18
+
+    this.beforeAll(async function () {
+      await token.connect(bob).transfer(alice.address, AMOUNT);
+    });
+
+    it("should reduce Bob's balance to 50", async function () {
+      const balance = await token.balanceOf(bob.address);
+      expect(balance).to.equal(AMOUNT);
+    });
+
+    it("should increase Alice's balance to 950", async function () {
+      const balance = await token.balanceOf(alice.address);
+      expect(balance).to.equal(ethers.BigNumber.from(10).pow(18).mul(950));
+    });
+
+    it("should set the balances commitment to match array [0, 950e18, 50e18, 0, ... ]", async function () {
+      const balancesComm = await token.BalancesCommitment();
+        const P1 = await adapter.P1();
+        // 950e18 * s
+        const aliceCoefficient = ethers.BigNumber.from(s)
+          .mul(ethers.BigNumber.from(10).pow(18).mul(950))
+          .mod(GROUP_ORDER);
+        const aliceComm = await helper.multiplyG1(P1, aliceCoefficient);
+        // 50e18 * s^2
+        const bobCoefficient = ethers.BigNumber.from(s)
+          .pow(2)
+          .mod(GROUP_ORDER)
+          .mul(ethers.BigNumber.from(10).pow(18).mul(50))
+          .mod(GROUP_ORDER);
+        const bobComm = await helper.multiplyG1(P1, bobCoefficient);
+        const expected = await helper.sumG1([aliceComm, bobComm]);
+        expect(balancesComm).to.deep.equal(expected);
     });
   });
 });
