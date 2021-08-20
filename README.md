@@ -30,6 +30,10 @@ This project is intended to be illustrative rather than functional. Therefore, t
 
 If you would like to discuss the idea, or suggest improvements, please contact me at nikesh@openzeppelin.com
 
+## Acknowledgements
+
+Thanks to [George Carder](https://github.com/georgercarder) for reviewing the design and offering feedback.
+
 ## A Fatal Design Flaw
 
 While building this code base I identified a flaw in the design that may be fatal. The "dot product" mechanism, which is used to count votes, cannot also be used to determine the aggregate public key from the `KeysCommitment`. This is because the "dot product" requires the aggregator to produce a polynomial with irrelevant terms before selecting the relevant ones, and they would not have enough information to construct the irrelevant ones. Specifically:
