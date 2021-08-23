@@ -34,9 +34,9 @@ If you would like to discuss the idea, or suggest improvements, please contact m
 
 Thanks to [George Carder](https://github.com/georgercarder) for reviewing the design and offering feedback.
 
-## A Fatal Design Flaw
+## A ~~Fatal~~  Design Flaw
 
-While building this code base I identified a flaw in the design that may be fatal. The "dot product" mechanism, which is used to count votes, cannot also be used to determine the aggregate public key from the `KeysCommitment`. This is because the "dot product" requires the aggregator to produce a polynomial with irrelevant terms before selecting the relevant ones, and they would not have enough information to construct the irrelevant ones. Specifically:
+While building this code base I identified a flaw in the design that ~~may be fatal~~ may be recoverable. The "dot product" mechanism, which is used to count votes, cannot also be used to determine the aggregate public key from the `KeysCommitment`. This is because the "dot product" requires the aggregator to produce a polynomial with irrelevant terms before selecting the relevant ones, and they would not have enough information to construct the irrelevant ones. Specifically:
 
 - the original design incorrectly implies the BLS public keys are coefficients of the Keys polynomial (that `KeyCommitment` represents)
 - this is a confusion, because BLS public keys are already elliptic curve points. Specifically, for private keys `a`, `b`, `c`, ..., the corresponding public keys are `a⋅[P2]`, `b⋅[P2]`, `c⋅[P2]`
@@ -82,3 +82,57 @@ Instead of doing a dot product, the users could publish the subset of `KeysCommi
 - Since all terms in the subset commitment are known, they could prove consistency of the aggregate public key as before
 
 This is undesirable because requiring user subsets to occur in ranges adds a lot of complexity. Moreover, a non-cooperative user in the middle of a subset would undermine the scheme, forcing the remaining users to form two subsets. This becomes more likely for very large subsets.
+
+### A partial solution: Subtract out the unwanted components of KeysCommitment
+
+Recall: the reason Alice and Charlie cannot compute a dot product of their `Selection` polynomial and the `KeysCommitment` polynomial is because the terms belonging to other users interfere with the calculation. This observation can be viewed as a validation: if they are able to compute a dot product with a subset of the terms in `KeysCommitment`, then that subset must only contain users in the selection. Specifically:
+- An aggregator sums the (public) commitments for the users not in the selection. In this case, it would produce
+    - <code>ComplementCommitment = (bs<sup>2</sup> + ds<sup>4</sup> + es<sup>5</sup> + ...)⋅[P2]</code>
+- They publish this value along with <code>SelectionCommitment = (s + s<sup>3)</sup>⋅[P2]</code>
+- The contract can calculate the sum of Alice and Charlie's keys commitment:
+    - <code>SelectedKeysCommitment = KeysCommitment - ComplementCommitment = (as + cs<sup>2</sup>)⋅[P2]</code>
+- The dot product of `SelectedKeysCommitment` and `SelectionCommitment` corresponds to the aggregate public key of Alice and Charlie and the rest of the procedure works as before
+- Since the contract can't validate `ComplementCommitment`, we should consider the cases:
+    - if `ComplementCommitment` eliminates too few terms (the calculated `SelectedKeysCommitment` still contains a term from someone outside the selection), the extraneous terms will prevent Alice and Charlie from computing the dot product
+        - there are some potential edge cases, since all users reveal additional manipulations of their public key (eg. Bob reveals `b⋅[P2]` and <code>bs<sup>MAX_DEGREE</sup>⋅[P2]</code> ) that could be used to compute some specially crafted dot products. This can be mitigated by checking for and preventing the edge cases or using slightly more complicated validations
+            - for example, Bob uses `b⋅[P2]` and <code>bs<sup>MAX_DEGREE</sup>⋅[P2]</code> to prove that him claimed <code>bs<sup>2</sup>⋅[P2]</code> only affects the second degree term. Instead, he could use `bα⋅[P2]` and <code>bαs<sup>MAX_DEGREE</sup>⋅[P2]</code> to prove <code>bαs<sup>2</sup>⋅[P2]</code> only affects the second degree term, for some random α, and use a pairing to prove that  <code>bαs<sup>2</sup>⋅[P2] = α * bs<sup>2</sup>⋅[P2]</code>.
+    - if `ComplementCommitment` modifies some of the extraneous terms without eliminating them (eg. `ComplementCommitment` has the term <code>Δs<sup>2</sup>⋅[P2]</code> so `SelectedKeysCommitment` will have the term <code>(b - Δ)s<sup>2</sup>⋅[P2]</code>), the dot product and signature will fail. Without knowing Bob's private key `b`, Alice and Charlie cannot select a `Δ` that eliminates the second-degree term's dependence on `b`.
+    - if `ComplementCommitment` modifies some of the terms in the selection (eg. `ComplementCommitment` has the term `Δs⋅[P2]` so `SelectedKeysCommitment` will have the term `(a - Δ)s⋅[P2]`), the aggregate public key will be altered, and Alice will have to make a corresponding adjustment to her signature. Note that the goal of the aggregate public key is to provide a mechanism for Alice and Charlie to prove that they signed a message, so there is no harm in allowing the aggregator to change Alice's public key as long as she's still the only one who can compute a signature.
+    - if `ComplementCommitment` eliminates too many terms (eg. `SelectedKeysCommitment` doesn't contain Charlie's public key, even though he's represented in `SelectionCommitment`) then the remaining users in the subset (in this case, just Alice) can sign a message on behalf of the missing user (Charlie).
+        - to mitigate this, the aggregator should have to perform a calculation that requires all the private keys in the selection.
+        - alternatively, they should have to prove that the number of terms in `SelectedKeysCommitment` mtaches the number of terms in `SelectionCommitment`
+        - I don't have a mechanism to achieve this yet. However, this still seems like progress.
+
+### An improved mechanism: Treat SelectedKeysCommitment as a public key
+
+The partial solution described above requires coordination from all the users in the subset to compute the dot product of `SelectedKeysCommitment` and `SelectionCommitment`. This is acceptable because it's offline coordination, but it would be preferable if they just published their signatures and anyone could aggregate them. It seems like this could be achieved by treating the `SelectedKeysCommitment` as the aggregate public key instead of summing the individual components.
+
+*WARNING*: This mechanism assumes two additional properties that aren't required for BLS signatures. They should be validated by a mathematician:
+- we can scale a public key by a secret <code>s<sup>i</sup></code> as long as we also scale the signature (I'm pretty confident about this)
+- given a point `a⋅[P2]`, it is infeasible to derive `a⋅[P1]`, where `a` is a scalar and `P1` and `P2` are the generators of Group 1 and Group 2. This means that the hash of the message can be a scalar `δ` instead of a point `δ⋅[P1]` (algorithm explained below)
+
+#### Background
+
+Recall BLS signatures work as follows:
+- Alice generates public key `a⋅[P2]` from private key `a`
+- nobody can recover `a` from the public key
+- given message hash `δ⋅[P1]` (with unknown `δ`), Alice can compute the signature `(aδ)⋅[P1]`
+- anyone can check that `e(δ⋅[P1], a⋅[P2]) == e((aδ)⋅[P1], [P2])`
+- if Bob has keypair `(b; b⋅[P2])`, he can generate his own signature `(bδ)⋅[P1]`
+- anyone can aggregate the signatures and public keys to form
+    - an aggregate signature `((a+b)δ)⋅[P1]`
+    - an aggregate public key `(a+b)⋅[P2]`
+- the aggregate signature check is the same as before
+    - `e(δ⋅[P1], (a+b)⋅[P2]) == e(((a+b)δ)⋅[P1], [P2])`
+
+#### Modification
+
+Instead of attempting to extract and combine the relevant public keys from `SelectedKeysCommitment`, we can set `δ` as a known hash (a scalar) that represents the message and treat the commitment itself as the aggregate public key:
+- each user would scale their signature by the appropriate power of s. For example, Alice produces the signature `(aδs)⋅[P1]` and Charlie produces <code>(cδs<sup>3</sup>)⋅[P1]</code>
+    - this is possible because `δ` is known and <code>s<sup>i</sup>⋅[P1]</code> is published in the trusted setup
+    - however, the public keys `(as)⋅[P2]` and <code>(cs<sup>3</sup>)⋅[P2]</code> are public so if `δ` is known, anyone can compute `(aδs)⋅[P2]` and <code>(cδs<sup>3</sup>)⋅[P2]</code>
+    - nevertheless, I believe they can't calculate the signatures `(aδs)⋅[P1]` and <code>(cδs<sup>3</sup>)⋅[P1]</code>
+- the `AggregateSignature` is <code>(aδs + cδs<sup>3</sup>)⋅[P1]</code>
+- the pairing check works the same as before:
+    - `e(δ⋅[P1], SelectedKeysCommitment) == e(AggregateSignature, [P2])` =>
+    - <code>e(δ⋅[P1], (as + cs<sup>2</sup>)⋅[P2]) == e((aδs + cδs<sup>3</sup>)⋅[P1], [P2])</code>
